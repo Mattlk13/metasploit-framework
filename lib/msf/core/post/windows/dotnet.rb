@@ -1,7 +1,4 @@
 # -*- coding: binary -*-
-require 'msf/core/post/common'
-require 'msf/core/post/windows/registry'
-
 module Msf::Post::Windows::Dotnet
   include ::Msf::Post::Common
   include ::Msf::Post::Windows::Registry
@@ -21,7 +18,7 @@ module Msf::Post::Windows::Dotnet
       subkeys = registry_enumvals(dotnet_subkey)
     rescue Rex::Post::Meterpreter::RequestError => e
       print_status("Encountered exception in search_for_version: #{e.class} #{e}")
-      elog("#{e.class} #{e.message}\n#{e.backtrace * "\n"}")
+      elog(e)
     end
     unless subkeys.nil?
       subkeys.each do |subkey|
@@ -44,7 +41,7 @@ module Msf::Post::Windows::Dotnet
       subkeys = registry_enumkeys(dotnet_vkey)
     rescue Rex::Post::Meterpreter::RequestError => e
       print_status("Encountered exception in get_versionception: #{e.class} #{e}")
-      elog("#{e.class} #{e.message}\n#{e.backtrace * "\n"}")
+      elog(e)
     end
     unless subkeys.nil?
       subkeys.each do |subkey|
@@ -69,7 +66,7 @@ module Msf::Post::Windows::Dotnet
       dotnet_keys = registry_enumkeys(key)
     rescue Rex::Post::Meterpreter::RequestError => e
       print_status("Encountered exception in get_dotnet_version: #{e.class} #{e}")
-      elog("#{e.class} #{e.message}\n#{e.backtrace * "\n"}")
+      elog(e)
     end
     unless dotnet_keys.nil?
       dotnet_keys.each do |temp_key|

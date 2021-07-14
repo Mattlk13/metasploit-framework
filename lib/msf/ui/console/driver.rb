@@ -1,12 +1,4 @@
 # -*- coding: binary -*-
-require 'msf/core'
-require 'msf/base'
-require 'msf/ui'
-require 'msf/ui/console/framework_event_manager'
-require 'msf/ui/console/command_dispatcher'
-require 'msf/ui/console/command_dispatcher/db'
-require 'msf/ui/console/command_dispatcher/creds'
-require 'msf/ui/console/table'
 require 'find'
 require 'erb'
 require 'rexml/document'
@@ -24,9 +16,8 @@ class Driver < Msf::Ui::Driver
 
   ConfigCore  = "framework/core"
   ConfigGroup = "framework/ui/console"
-  DbConfigGroup = "framework/database"
 
-  DefaultPrompt     = "%undmsf5%clr"
+  DefaultPrompt     = "%undmsf#{Metasploit::Framework::Version::MAJOR}%clr"
   DefaultPromptChar = "%clr>"
 
   #
@@ -87,7 +78,7 @@ class Driver < Msf::Ui::Driver
     end
 
     # Call the parent
-    super(prompt, prompt_char, histfile, framework)
+    super(prompt, prompt_char, histfile, framework, :msfconsole)
 
     # Temporarily disable output
     self.disable_output = true
@@ -126,11 +117,16 @@ class Driver < Msf::Ui::Driver
     end
 
     # Load the other "core" command dispatchers
-    CommandDispatchers.each do |dispatcher|
-      enstack_dispatcher(dispatcher)
+    CommandDispatchers.each do |dispatcher_class|
+      dispatcher = enstack_dispatcher(dispatcher_class)
+      dispatcher.load_config(opts['Config'])
     end
 
-    load_db_config(opts['Config'])
+    begin
+      FeatureManager.instance.load_config
+    rescue StandardException => e
+      elog(e)
+    end
 
     if !framework.db || !framework.db.active
       if framework.db.error == "disabled"
@@ -225,38 +221,6 @@ class Driver < Msf::Ui::Driver
     end
   end
 
-  def load_db_config(path=nil)
-    begin
-      conf = Msf::Config.load(path)
-    rescue
-      wlog("Failed to load configuration: #{$!}")
-      return
-    end
-
-    if conf.group?(DbConfigGroup)
-      conf[DbConfigGroup].each_pair do |k, v|
-        if k.downcase == 'default_db'
-          ilog "Default data service found. Attempting to connect..."
-          default_db_config_path = "#{DbConfigGroup}/#{v}"
-          default_db = conf[default_db_config_path]
-          if default_db
-            connect_string = "db_connect #{v}"
-
-            if framework.db.active && default_db['url'] !~ /http/
-              ilog "Existing local data connection found. Disconnecting first."
-              run_single("db_disconnect")
-            end
-
-            run_single(connect_string)
-          else
-            elog "Config entry for '#{default_db_config_path}' could not be found. Config file might be corrupt."
-            return
-          end
-        end
-      end
-    end
-  end
-
   #
   # Loads configuration for the console.
   #
@@ -285,9 +249,9 @@ class Driver < Msf::Ui::Driver
   end
 
   #
-  # Saves configuration for the console.
+  # Generate configuration for the console.
   #
-  def save_config
+  def get_config
     # Build out the console config group
     group = {}
 
@@ -301,9 +265,23 @@ class Driver < Msf::Ui::Driver
       end
     end
 
-    # Save it
+    group
+  end
+
+  def get_config_core
+    ConfigCore
+  end
+
+  def get_config_group
+    ConfigGroup
+  end
+
+  #
+  # Saves configuration for the console.
+  #
+  def save_config
     begin
-      Msf::Config.save(ConfigGroup => group)
+      Msf::Config.save(ConfigGroup => get_config)
     rescue ::Exception
       print_error("Failed to save console config: #{$!}")
     end
@@ -374,7 +352,7 @@ class Driver < Msf::Ui::Driver
       print_warning(log_msg)
     end
 
-    if framework.db && framework.db.active
+    if framework.db&.active
       framework.db.workspace = framework.db.default_workspace unless framework.db.workspace
     end
 
@@ -387,11 +365,23 @@ class Driver < Msf::Ui::Driver
 
     run_single("banner") unless opts['DisableBanner']
 
+    av_warning_message if framework.eicar_corrupted?
+
     opts["Plugins"].each do |plug|
       run_single("load '#{plug}'")
     end if opts["Plugins"]
 
     self.on_command_proc = Proc.new { |command| framework.events.on_ui_command(command) }
+  end
+
+  def av_warning_message
+      avdwarn = "\e[31m"\
+                "Warning: This copy of the Metasploit Framework has been corrupted by an installed anti-virus program."\
+                " We recommend that you disable your anti-virus or exclude your Metasploit installation path, "\
+                "then restore the removed files from quarantine or reinstall the framework.\e[0m"\
+                "\n\n"
+
+      $stderr.puts(Msf::Serializer::ReadableText.word_wrap(avdwarn, 0, 80))
   end
 
   #

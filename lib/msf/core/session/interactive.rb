@@ -1,5 +1,4 @@
 # -*- coding: binary -*-
-require 'rex/ui'
 
 module Msf
 module Session
@@ -127,7 +126,7 @@ protected
     rescue Interrupt
       # The user hit ctrl-c while we were handling a ctrl-c. Ignore
     end
-    p ""
+    true
   end
 
   def _usr1

@@ -1,5 +1,4 @@
 # -*- coding: binary -*-
-require 'msf/base'
 
 module Msf
 module Simple
@@ -95,8 +94,7 @@ module Evasion
     rescue ::Exception => e
       evasion.error = e
       evasion.print_error("evasion failed: #{e}")
-      elog("Evasion failed (#{evasion.refname}): #{e}", 'core', LEV_0)
-      dlog("Call stack:\n#{e.backtrace.join("\n")}", 'core', LEV_3)
+      elog("Evasion failed (#{evasion.refname})", error: e)
     end
 
     nil

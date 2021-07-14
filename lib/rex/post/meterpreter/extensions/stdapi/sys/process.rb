@@ -82,7 +82,7 @@ class Process < Rex::Post::Process
   # Low-level process open.
   #
   def Process._open(pid, perms, inherit = false)
-    request = Packet.create_request('stdapi_sys_process_attach')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_ATTACH)
 
     if (pid == nil)
       pid = 0
@@ -116,7 +116,7 @@ class Process < Rex::Post::Process
   #   InMemory    => true/false
   #
   def Process.execute(path, arguments = nil, opts = nil)
-    request = Packet.create_request('stdapi_sys_process_execute')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_EXECUTE)
     flags   = 0
 
     # If we were supplied optional arguments...
@@ -189,10 +189,41 @@ class Process < Rex::Post::Process
   end
 
   #
+  # Execute an application and capture the output
+  #
+  def Process.capture_output(path, arguments = nil, opts = nil, time_out = 15)
+    start = Time.now.to_i
+    process = execute(path, arguments, opts)
+    data = ""
+
+    # Wait up to time_out seconds for the first bytes to arrive
+    while (d = process.channel.read)
+      data << d
+      if d == ""
+        if Time.now.to_i - start < time_out
+          sleep 0.1
+        else
+          break
+        end
+      end
+    end
+    data.chomp! if data
+
+    begin
+      process.channel.close
+    rescue IOError => e
+      # Channel was already closed, but we got the cmd output, so let's soldier on.
+    end
+    process.close
+
+    return data
+  end
+
+  #
   # Kills one or more processes.
   #
   def Process.kill(*args)
-    request = Packet.create_request('stdapi_sys_process_kill')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_KILL)
 
     args.each { |id|
       request.add_tlv(TLV_TYPE_PID, id)
@@ -207,7 +238,7 @@ class Process < Rex::Post::Process
   # Gets the process id that the remote side is executing under.
   #
   def Process.getpid
-    request = Packet.create_request('stdapi_sys_process_getpid')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_GETPID)
 
     response = client.send_request(request)
 
@@ -226,7 +257,7 @@ class Process < Rex::Post::Process
   # 'ppid', 'name', 'path', 'user', 'session' and 'arch'.
   #
   def Process.get_processes
-    request   = Packet.create_request('stdapi_sys_process_get_processes')
+    request   = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_GET_PROCESSES)
     processes = ProcessList.new
 
     response = client.send_request(request)
@@ -323,9 +354,9 @@ class Process < Rex::Post::Process
   # Closes the handle to the process that was opened.
   #
   def self.close(client, handle)
-    request = Packet.create_request('stdapi_sys_process_close')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_CLOSE)
     request.add_tlv(TLV_TYPE_HANDLE, handle)
-    response = client.send_request(request, nil)
+    client.send_request(request, nil)
     handle = nil;
     return true
   end
@@ -347,11 +378,11 @@ class Process < Rex::Post::Process
   # occur as we may be waiting indefinatly for the process to terminate.
   #
   def wait( timeout = -1 )
-    request = Packet.create_request('stdapi_sys_process_wait')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_WAIT)
 
     request.add_tlv(TLV_TYPE_HANDLE, self.handle)
 
-    response = self.client.send_request(request, timeout)
+    self.client.send_request(request, timeout)
 
     self.handle = nil
 
@@ -366,7 +397,7 @@ protected
   # Gathers information about the process and returns a hash.
   #
   def get_info
-    request = Packet.create_request('stdapi_sys_process_get_info')
+    request = Packet.create_request(COMMAND_ID_STDAPI_SYS_PROCESS_GET_INFO)
     info    = {}
 
     request.add_tlv(TLV_TYPE_HANDLE, handle)

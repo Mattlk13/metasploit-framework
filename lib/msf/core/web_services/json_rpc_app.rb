@@ -2,14 +2,7 @@ require 'securerandom'
 require 'sinatra/base'
 require 'swagger/blocks'
 require 'warden'
-require 'msf/core/rpc'
 require 'msf/core/web_services/authentication'
-require 'msf/core/web_services/framework_extension'
-require 'msf/core/web_services/servlet_helper'
-require 'msf/core/web_services/servlet/auth_servlet'
-require 'msf/core/web_services/servlet/json_rpc_servlet'
-require 'msf/core/web_services/json_rpc_exception_handling'
-
 module Msf::WebServices
   class JsonRpcApp < Sinatra::Base
 
@@ -21,6 +14,7 @@ module Msf::WebServices
 
     # Servlet registration
     register AuthServlet
+    register HealthServlet
     register JsonRpcServlet
 
     # Custom error handling
@@ -39,15 +33,15 @@ module Msf::WebServices
 
     before do
       db = get_db
+      @@auth_initialized = false
       if db_initialized(db)
         # store DBManager in request environment so that it is available to Warden
         request.env['msf.db_manager'] = db
         @@auth_initialized ||= get_db.users({}).count > 0
-      elsif !settings.api_token.nil?
+      end
+      if !settings.api_token.nil?
         @@auth_initialized = true
         request.env['msf.api_token'] = settings.api_token
-      else
-        @@auth_initialized = false
       end
 
       # store flag indicating whether authentication is initialized in the request environment
